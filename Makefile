@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-Wall -Wextra -L. -lftd2xx -lpthread -ldl -lrt -Wl,-rpath /usr/local/lib
+CFLAGS= -Ofast -Wall -Wextra -L. -lftd2xx -lpthread -ldl -lrt -Wl,-rpath /usr/local/lib
 APP = sigAnc
 
 all: $(APP)

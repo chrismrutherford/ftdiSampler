@@ -19,7 +19,9 @@ public:
     bool sample();
     bool read();
     bool delay();
+    bool loops(int delay);
 private:
+    int mK;
     uint64_t mLastTime;
     uint64_t mRefTime;
     FT_STATUS mFtStatus;
@@ -32,9 +34,9 @@ private:
 };
 
 
-Sampler::Sampler():mFtStatus(FT_OK),mPortNumber(0),mBaudRate(921600),mHold(500),mSampleNo(0)
+Sampler::Sampler():mFtStatus(FT_OK),mPortNumber(0),mBaudRate(921600),mHold(1),mSampleNo(0)
 {
-    mLastTime = getTimeStamp()/1000000*1000000;
+    mLastTime = getTimeStamp()/100000*100000;
     mRefTime = mLastTime;
 }
 
@@ -71,7 +73,7 @@ bool Sampler::delay()
 
     /*
     */
-    if(mSampleNo%10000==0)
+    if(mSampleNo%100000==0)
     {
         cout <<"sleep " << sleepTime << endl;
         cout <<"lagg " << laggTime << endl;
@@ -80,13 +82,34 @@ bool Sampler::delay()
         cout <<"reading "  << (int)mPinStatus << endl;
     }
     
-    usleep(sleepTime);
+    //usleep(1);
+    loops(sleepTime);
+    return 0;
+}
+
+bool Sampler::loops(int delay)
+{
+
+    for(int i=0;i<delay;i++)
+    {
+        for(int j=0;j<delay;j++)
+        {
+            for(int k=0;k<delay;k++)
+            {
+                for(int l=0;l<delay;l++)
+                {
+                    mK=i+j+k+l;
+                }
+            }
+        }
+    }
     return 0;
 }
 
 bool Sampler::read() 
 {
-	mFtStatus = FT_GetBitMode(mFtHandle, &mPinStatus);
+	//mFtStatus = FT_GetBitMode(mFtHandle, &mPinStatus);
+    mPinStatus = (mPinStatus & 16)/16;
 	if (mFtStatus != FT_OK) 
 	{
 		printf("FT_GetBitMode failed (error %d).\n", (int)mFtStatus);
@@ -101,7 +124,8 @@ bool Sampler::sample()
     while(1)
     {
         read();
-        cout <<"read " << (int)mPinStatus << endl;
+        //cout <<"read " << (int)mPinStatus << endl;
+            //cout << (int)mPinStatus;
         delay();
     }
     return 0;
@@ -127,7 +151,7 @@ uint64_t Sampler::elapsed()
 
 int main () {
     Sampler sampler;
-    sampler.init();
+    //sampler.init();
     sampler.sample();
 return 0;
 }
