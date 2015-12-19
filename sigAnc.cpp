@@ -108,7 +108,7 @@ bool Sampler::loops(int delay)
 
 bool Sampler::read() 
 {
-	//mFtStatus = FT_GetBitMode(mFtHandle, &mPinStatus);
+	mFtStatus = FT_GetBitMode(mFtHandle, &mPinStatus);
     mPinStatus = (mPinStatus & 16)/16;
 	if (mFtStatus != FT_OK) 
 	{
@@ -125,7 +125,7 @@ bool Sampler::sample()
     {
         read();
         //cout <<"read " << (int)mPinStatus << endl;
-            //cout << (int)mPinStatus;
+        cout << (int)mPinStatus;
         delay();
     }
     return 0;
@@ -151,7 +151,7 @@ uint64_t Sampler::elapsed()
 
 int main () {
     Sampler sampler;
-    //sampler.init();
+    sampler.init();
     sampler.sample();
 return 0;
 }
