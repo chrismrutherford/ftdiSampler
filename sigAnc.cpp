@@ -14,16 +14,22 @@
 
 #include "CircBuff.h"
 
-#define BUFSZ 16000
+#define BUFSZ 4096
 
-#define SYNCSZ 500
+#define SCALE 4
+
+#define SYNCSZ 200*SCALE
 
 using namespace std;
 
 class Bits
 {
 public:
-    Bits(bool val, int count) {v=val;c=count; }
+    Bits(bool val, int count)
+    {
+        v=val;
+        c=count;
+    }
     bool v;
     int  c;
 };
@@ -62,7 +68,7 @@ private:
 };
 
 
-Sampler::Sampler():mFtStatus(FT_OK),mPortNumber(0),mBaudRate(9600),mHold(1),mSampleNo(0)
+Sampler::Sampler():mFtStatus(FT_OK),mPortNumber(0),mBaudRate(9600*SCALE),mHold(1),mSampleNo(0)
 {
     mElapsedTime = getTimeStamp();
     mRefTime = mElapsedTime / 100000 * 100000;
@@ -84,13 +90,13 @@ bool Sampler::syncDetect(int reading)
         {
             zeros = false;
         }
-        
+
     }
 
     if(reading == 1 && zeros == true)
     {
         retVal = true;
-        
+
     }
 
     if(mSyncBuffer.size() > SYNCSZ)
@@ -116,14 +122,14 @@ int Sampler::init()
         retVal = 1;
     }
 
-	printf("Selecting asynchronous bit-bang mode.\n");	
-	mFtStatus = FT_SetBitMode(mFtHandle, 
-	                         0x00, /* sets all 8 pins as inputs */
-	                         FT_BITMODE_ASYNC_BITBANG);
-	if (mFtStatus != FT_OK) 
-	{
-		printf("FT_SetBitMode failed (error %d).\n", (int)mFtStatus);
-	}
+    printf("Selecting asynchronous bit-bang mode.\n");
+    mFtStatus = FT_SetBitMode(mFtHandle,
+                              0x00, /* sets all 8 pins as inputs */
+                              FT_BITMODE_ASYNC_BITBANG);
+    if (mFtStatus != FT_OK)
+    {
+        printf("FT_SetBitMode failed (error %d).\n", (int)mFtStatus);
+    }
 
     printf("Setting clock rate to %d\n", mBaudRate * 16);
     mFtStatus = FT_SetBaudRate(mFtHandle, mBaudRate);
@@ -175,11 +181,12 @@ void Sampler::procBuffer()
             string str = line.str();
             //if(str.size() > SYNCSZ)str.resize (str.size () - SYNCSZ);
             //cout << "last " <<str.find_last_of("1");
-            int pos = str.find_last_of("1");
-            if(pos > 0)
-            {
-                str.resize (pos+1);
-            }
+            //int pos = str.find_last_of("1");
+            //if(pos > 0)
+            //{
+            //    str.resize (pos+1);
+            //}
+            //cout << "raw line " << str << endl;
             procLine(str);
             line.str( std::string() );
             line.clear();
@@ -197,24 +204,34 @@ string Sampler::procLine(string line)
     bool val     = false;
     int charCount = 0;
     bool first = false;
-    //cout << line << " " << line.length() << endl;
-    char lastChar = 'U';
+
+    cout << "line len " << line.length() << endl;
+
     for(uint32_t i=0; i<line.length(); i++)
     {
         charCount++;
         char subChar = line.at(i);
 
-        if(subChar == '0') { val=false; }
-        else { val=true; }
+        if(subChar == '0')
+        {
+            val=false;
+        }
+        else
+        {
+            val=true;
+        }
 
-        if(first == true) { first = false; lastVal = val; }
+        if(first == true)
+        {
+            first = false;
+            lastVal = !val;
+        }
 
         if(val != lastVal )
         {
             cout << lastVal << ":" << charCount << ", ";
-            mBitBuffer.push_back(Bits(val, charCount));
+            mBitBuffer.push_back(Bits(lastVal, charCount));
             charCount=0;
-            lastChar = subChar;
             lastVal = val;
         }
     }
