@@ -1,11 +1,14 @@
 CC=g++
 CFLAGS= -Ofast -Wall -Wextra -L. -lftd2xx -lpthread -ldl -lrt -Wl,-rpath /usr/local/lib
-APP = sigAnc
+SAMPLER = sigAnc
+REPLAY = replay
 
-all: $(APP)
+all: $(SAMPLER) $(REPLAY)
 
-$(APP): sigAnc.cpp	
-	$(CC) sigAnc.cpp -o $(APP) $(CFLAGS) -I /usr/local/include
+$(SAMPLER): sigAnc.cpp
+	$(CC) sigAnc.cpp -o $(SAMPLER) $(CFLAGS) -I /usr/local/include
 	
+$(REPLAY): replay.cpp
+	$(CC) replay.cpp -o $(REPLAY) $(CFLAGS) -I /usr/local/include
 clean:
-	rm -f *.o ; rm $(APP)
+	rm -f *.o ; rm $(SAMPLER)

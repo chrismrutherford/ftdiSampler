@@ -1,77 +1,16 @@
-
-
-#include <stdio.h>
-#include <ftd2xx.h>
-
-#include <iostream>
-#include <sstream>
-
-#include <stdint.h>
-#include <sys/time.h>
-#include <unistd.h>
-
-#include <list>
-
-#include "CircBuff.h"
-
-#define BUFSZ 4096
-
-#define SCALE 4
-
-#define SYNCSZ 200*SCALE
-
-using namespace std;
-
-class Bits
-{
-public:
-    Bits(bool val, int count)
-    {
-        v=val;
-        c=count;
-    }
-    bool v;
-    int  c;
-};
-
-
-class Sampler
-{
-public:
-    Sampler();
-    uint64_t getTimeStamp();
-    uint64_t elapsed();
-    int init();
-    bool sample();
-    int read();
-    bool delay();
-    bool loops(int delay);
-    bool syncDetect(int reading);
-    void  procBuffer();
-    string procLine(string line);
-
-private:
-    int mK;
-    uint64_t mRefTime;
-    uint64_t mElapsedTime;
-    FT_STATUS mFtStatus;
-    FT_HANDLE mFtHandle;
-    int mPortNumber;
-    DWORD  mBaudRate;
-    UCHAR  mPinStatus;
-    int mHold;
-    uint64_t mSampleNo;
-    list<int> mSyncBuffer;
-    list<string> mSampleBuffer;
-    list<Bits> mBitBuffer;
-    uint8_t mBuffer[BUFSZ];
-};
-
+#include "sigAnc.h"
 
 Sampler::Sampler():mFtStatus(FT_OK),mPortNumber(0),mBaudRate(9600*SCALE),mHold(1),mSampleNo(0)
 {
+    long lSize;
     mElapsedTime = getTimeStamp();
     mRefTime = mElapsedTime / 100000 * 100000;
+
+    pFile = fopen("/tmp/sample.bin","wb");
+    fseek(pFile, 0, SEEK_END);
+    lSize = ftell(pFile);
+    rewind(pFile);
+
 
 }
 
@@ -153,21 +92,30 @@ int Sampler::read()
     mFtStatus =  FT_Read (mFtHandle, mBuffer, BUFSZ, &readBytes);
     mSampleNo+=readBytes;
 
+    fwrite(mBuffer,1,readBytes,pFile);
+
     return readBytes;
 }
 
 
 bool Sampler::sample()
 {
+    bool retVal = false;
     while(1)
     {
-        procBuffer();
+        retVal = procBuffer();
+        if(retVal == true)
+        {
+            procBits();
+        }
     }
     return 0;
 }
 
-void Sampler::procBuffer()
+bool Sampler::procBuffer()
 {
+    bool retVal = false;
+    static int state = 0;
     static stringstream line;
     static int bits = 0;
     int readBytes = read();
@@ -179,33 +127,46 @@ void Sampler::procBuffer()
         if(syncDetect(data) == true)
         {
             string str = line.str();
-            //if(str.size() > SYNCSZ)str.resize (str.size () - SYNCSZ);
-            //cout << "last " <<str.find_last_of("1");
-            //int pos = str.find_last_of("1");
-            //if(pos > 0)
-            //{
-            //    str.resize (pos+1);
-            //}
-            //cout << "raw line " << str << endl;
-            procLine(str);
+            retVal = procLine(str);
             line.str( std::string() );
             line.clear();
             bits=0;
+
+            if(state == 0)
+            {
+                state = 1;
+                mBitBuffer.clear();
+            }
+            else if(state == 1) 
+            {
+                retVal = true;
+                state = 0;
+            }
+        }
+
+        if(bits > 15000)
+        {
+            line.str( std::string() );
+            line.clear();
+            bits=0;
+
         }
 
         line << (int)data;
     }
+    return retVal;
 }
 
-string Sampler::procLine(string line)
+bool Sampler::procLine(string line)
 {
+    bool retVal = false;
     string subSample;
     bool lastVal = 0;
     bool val     = false;
     int charCount = 0;
     bool first = false;
 
-    cout << "line len " << line.length() << endl;
+    //cout << "line len " << line.length() << endl;
 
     for(uint32_t i=0; i<line.length(); i++)
     {
@@ -229,14 +190,12 @@ string Sampler::procLine(string line)
 
         if(val != lastVal )
         {
-            cout << lastVal << ":" << charCount << ", ";
             mBitBuffer.push_back(Bits(lastVal, charCount));
             charCount=0;
             lastVal = val;
         }
     }
-    cout << endl;
-    return subSample;
+    return retVal;
 }
 
 uint64_t Sampler::getTimeStamp()
@@ -252,6 +211,47 @@ uint64_t Sampler::elapsed()
     uint64_t elapsed = now - mElapsedTime;
     mElapsedTime = now;
     return elapsed;
+}
+
+bool Sampler::procBits()
+{
+    bool retVal = false;
+    list<Bits>::iterator i;
+    list<Bits> result;
+
+    //mBitBuffer.pop_front();
+
+    for(i=mBitBuffer.begin(); i != mBitBuffer.end(); ++i)
+    {
+        Bits data = (*i);
+        int count = data.c;
+        bool val = data.v;
+        //cout << val << ":";
+        //cout.fill('0');
+        //cout.width(3);
+        //cout << count << ", ";
+
+        if(val==0 && count > 75 && count < 150)
+        {
+            cout << "0";
+        }
+        else if(val==1 && count > 75 && count < 150)
+        {
+            cout << "1";
+        }
+        else if(val==0 && count > 275 && count < 350)
+        {
+            cout << "00";
+
+        }
+        else if(val==1 && count > 275 && count < 350)
+        {
+            cout << "11";
+
+        }
+    }
+    cout << endl;
+    return retVal;
 }
 
 
